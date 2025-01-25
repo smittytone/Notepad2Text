@@ -7,15 +7,16 @@ Started	: 13/11/1996
 Updated : 25/01/2025 by Tony Smith (@smittytone)
 Version	: 1.1
 
-Changes :	(v1.0)
+Changes :
+    - 1.0
         - added commandline input with auto output filename creation
-          using remove_ext() & removed interactive input
-
+          using remove_ext() & removed interactive input.
         - added simple help screen.
-
         - changed error message for unrecognised NP format code.
-
         - added checking and proper handling for \,{ & } characters.
+    - 1.1
+        - Fix to build under Linux.
+        - Code tidy.
 =========================================================================
 */
 
@@ -25,7 +26,7 @@ Changes :	(v1.0)
 #include <ctype.h>
 //#include <process.h>  /* Windows only? I', focusing on Linux (TS) */
 
-#define version "1.0" /* make sure to keep this up to date*/
+#define version "1.1" /* make sure to keep this up to date*/
 
 #define doc_start  "{\\rtf1\\ansi{\\fonttbl{\\f0\\fs24 Times New Roman;}}\n"
 #define text_start "\\pard\\plain\\fs24 "
