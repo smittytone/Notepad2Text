@@ -15,7 +15,8 @@ Changes :
         - changed error message for unrecognised NP format code.
         - added checking and proper handling for \,{ & } characters.
     - 1.1
-        - Fix to build under Linux.
+        - Fix to build under Linux/macOS.
+        - Add optional debug output
         - Code tidy.
 =========================================================================
 */
@@ -66,15 +67,15 @@ Changes :
 /* Allow for debugging, or comment out */
 #define DEBUG 1
 
-int conv_wp(unsigned char code,char *out_str,int *first_time);
-void remove_ext(char *in_name,char *out_name);
-void debug(char code, int location);
-void debug_out(char* message);
+int conv_wp(unsigned char code, char *out_str, int *first_time);
+void remove_ext(char *in_name, char *out_name);
+void debug(int code, int location);
+void output_debug(char* message);
 void help_scr(void);
 
 /* ========================== MAIN ========================= */
 
-void main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) {
 
     char out_filename[max_filename_size];
     char code_str[max_format_string];
@@ -82,8 +83,7 @@ void main(int argc, char *argv[]) {
     /* Used to check each char of input file */
     unsigned char parse_ch;
     /* Used to tell `conv_wp()` that it's being called for the first time */
-    int first = 1;     
-    
+    int first = 1;
 
     /* ============ start of filenames input section ================ */
 
@@ -100,12 +100,12 @@ void main(int argc, char *argv[]) {
 
     if (argc == 2) {
         in_file = fopen(argv[1], "r");
-        if (in_file == NULL) { 
+        if (in_file == NULL) {
             /* check for error in fopen */
             printf("[Error] Failed to open input file\n");
             exit(1);
         }
-  
+
         remove_ext(argv[1], out_filename);
         strcat(out_filename, ".rtf");
         out_file = fopen(out_filename, "w");
@@ -138,12 +138,12 @@ void main(int argc, char *argv[]) {
                 /* convert & check return value for error from conv_wp() */
                 if (!(conv_wp(parse_ch, code_str, &first))) {
                     /* write RTF format string to file */
-                    fprintf(out_file, "%s", code_str); 	
+                    fprintf(out_file, "%s", code_str);
                 } else {
                     printf("[Warning] Unknown code found (0x%02X) at %d, output may be corrupted\n", parse_ch, char_count);
                     fprintf(out_file, "%s", code_str);
                 }
-                break; 
+                break;
                 /* end of case escd */
             case lnfd:
                 /* fs24 insures correct initial font size */
@@ -155,7 +155,7 @@ void main(int argc, char *argv[]) {
                 /* ignore soft-CR and end-of-doc marker */
                 do_debug = 1;
                 break;
-            case lbrack: 
+            case lbrack:
                 /* check for left curly bracket (special RTF char) */
                 fprintf(out_file, "\\%c", parse_ch);
                 do_debug = 1;
@@ -164,7 +164,7 @@ void main(int argc, char *argv[]) {
                 /* check for right curly bracket (special RTF char) */
                 fprintf(out_file, "\\%c", parse_ch);
                 break;
-            case bslash: 
+            case bslash:
                 /* check for backslash (special RTF char) */
                 fprintf(out_file, "\\%c", parse_ch);
                 do_debug = 1;
@@ -194,6 +194,7 @@ void main(int argc, char *argv[]) {
     fclose(out_file);
 
     printf("Conversion successful\n");
+    exit(0);
 
 } /* end of main */
 
@@ -204,8 +205,8 @@ int conv_wp(unsigned char code, char *out_str, int *first_time) {
     int a;
     /* this holds the status of any pending formating
     the layout is : fcode[x] with x as per the defines below */
-    static int f_code[(num_of_fcodes + 1)]; 
-                                            
+    static int f_code[(num_of_fcodes + 1)];
+
     #define b 0  /* bold */
     #define i 1  /* italic */
     #define u 2  /* underline */
@@ -216,7 +217,7 @@ int conv_wp(unsigned char code, char *out_str, int *first_time) {
     /* init array to clear (all zeros) if this first time being called */
     if (*first_time == 1) {
         /* reset so not done again during this execution */
-        *first_time = 0; 
+        *first_time = 0;
         a = 0;
         while (f_code[a] != 0) {
             f_code[a] = 0;
@@ -252,7 +253,7 @@ int conv_wp(unsigned char code, char *out_str, int *first_time) {
             return 0;
         default:
             /* return 1 to indicate unrecognised format code */
-            return 1; 
+            return 1;
     } /* end of switch */
 
     /* adds the relevant RTF format codes to the format string code_str that */
@@ -266,28 +267,28 @@ int conv_wp(unsigned char code, char *out_str, int *first_time) {
     else strcat(out_str, "\\fs24 ");
 
     /* return zero to indicate successful completion of function */
-    return 0;  
+    return 0;
 
 } /* end of function conv_wp */
 
 /* ===================================================================== */
 
 /* removes ext (if any) from a given filename string and passes back as
-   out_name 
+   out_name
  */
 void remove_ext(char *in_name, char *out_name) {
 
     int cnt=0;
     while ((in_name[cnt] != '.') && (in_name[cnt] != '\0')) {
         /* step thru in_name looking for . or end of string */
-        cnt++; 
+        cnt++;
     }
 
     out_name[cnt] = '\0';
     /* this terminates out_name at the location of the "." in in_name string */
-    
+
     /* now copy everything but filename ext into out_name */
-    while (cnt>0) { 
+    while (cnt>0) {
         cnt--; /* dec here so that we start with char before the "." */
         out_name[cnt] = in_name[cnt];
     }
@@ -296,12 +297,13 @@ void remove_ext(char *in_name, char *out_name) {
 /* ===================================================================== */
 
 #ifdef DEBUG
-void debug(char code, int location) {
+void debug(int code, int location) {
 
     static int eod_reported = 0;
-    char message[32] = {0};
-    char item[32] = {0};
-    
+    char message[64] = "";
+    char item[24] = "";
+
+    // Generate a human-friendly code explanation
     switch(code) {
         case bold:
             sprintf(item, "bold");
@@ -351,16 +353,18 @@ void debug(char code, int location) {
             break;
     }
 
+    // Got an real name for the format? Print it out, or just state the code
     if (strlen(item) > 0) {
-        sprintf(message, "Found %s marker at location %d", item, location);
+        sprintf(message, "Found %s marker at location %d", (const char*)item, location);
     } else {
         sprintf(message, "Found code 0x%02X at location %d", code, location);
     }
 
-    debug_out(message);
+    // Output the final debug message
+    output_debug(message);
 }
 
-void debug_out(char* message) {
+void output_debug(char* message) {
 
     printf("[DEBUG] %s\n", message);
 }
