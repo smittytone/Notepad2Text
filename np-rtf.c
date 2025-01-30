@@ -43,6 +43,7 @@ Changes :
 #define subs 0xF3 /* subscript */
 #define sups 0xF4 /* superscript */
 #define larg 0xEC /* enlarged */
+#define spc  0x90 /* soft space */
 
 #define num_of_fcodes 6 /* number of paired format codes */
 
@@ -51,6 +52,7 @@ Changes :
 #define escd 0x05 /* escape code for format code characters */
 #define soft 0x8A /* "soft" carriage-return (occurs after a CR character) */
 #define lnfd 0x0A /* line-feed (occurs after a CR char to indicate end of line */
+#define eod  0x1A /* end of doc marker - usually get a line of these */
 
 /* Special RTF characters: */
 
@@ -61,8 +63,13 @@ Changes :
 #define max_filename_size 257 /* allows for long filenames */
 #define max_format_string 25
 
+/* Allow for debugging, or comment out */
+#define DEBUG 1
+
 int conv_wp(unsigned char code,char *out_str,int *first_time);
 void remove_ext(char *in_name,char *out_name);
+void debug(char code, int location);
+void debug_out(char* message);
 void help_scr(void);
 
 /* ========================== MAIN ========================= */
@@ -70,11 +77,13 @@ void help_scr(void);
 void main(int argc, char *argv[]) {
 
     char out_filename[max_filename_size];
-    FILE *in_file, *out_file;
-    unsigned char parse_ch;	/* used to check each char of input file */
-    int first=1;		/* used to tell conv_wp that it's being
-               called for the first time */
     char code_str[max_format_string];
+    FILE *in_file, *out_file;
+    /* Used to check each char of input file */
+    unsigned char parse_ch;
+    /* Used to tell `conv_wp()` that it's being called for the first time */
+    int first = 1;     
+    
 
     /* ============ start of filenames input section ================ */
 
@@ -84,7 +93,7 @@ void main(int argc, char *argv[]) {
     }
 
     if (argc > 2) {
-        printf("[Error] Too many command line arguments");
+        printf("[Error] Too many command line arguments\n");
         help_scr();
         exit(1);
     }
@@ -93,7 +102,7 @@ void main(int argc, char *argv[]) {
         in_file = fopen(argv[1], "r");
         if (in_file == NULL) { 
             /* check for error in fopen */
-            printf("[Error] Failed to open input file");
+            printf("[Error] Failed to open input file\n");
             exit(1);
         }
   
@@ -102,7 +111,7 @@ void main(int argc, char *argv[]) {
         out_file = fopen(out_filename, "w");
         if (out_file == NULL) {
             /* check for error in fopen */
-            printf("[Error] Failed to open output file");
+            printf("[Error] Failed to open output file\n");
             exit(1);
         }
     }
@@ -112,20 +121,26 @@ void main(int argc, char *argv[]) {
     fprintf(out_file,doc_start);  /* standard RTF begin doc codes */
     fprintf(out_file,text_start);
 
+    int char_count = 0;
+    int do_debug = 0;
     while (!(feof(in_file))) {
         parse_ch = getc(in_file);
         switch(parse_ch) {
             /* check for CR's or ESC code */
             case escd:
                 /* read the char after the esc code or CR */
-                parse_ch = getc(in_file);  
+                char_count++;
+                parse_ch = getc(in_file);
+#ifdef DEBUG
+                debug(parse_ch, char_count);
+#endif
 
                 /* convert & check return value for error from conv_wp() */
                 if (!(conv_wp(parse_ch, code_str, &first))) {
                     /* write RTF format string to file */
                     fprintf(out_file, "%s", code_str); 	
                 } else {
-                    printf("[Warning] Unknown code found, output may be corrupted");
+                    printf("[Warning] Unknown code found (0x%02X) at %d, output may be corrupted\n", parse_ch, char_count);
                     fprintf(out_file, "%s", code_str);
                 }
                 break; 
@@ -133,13 +148,17 @@ void main(int argc, char *argv[]) {
             case lnfd:
                 /* fs24 insures correct initial font size */
                 fprintf(out_file, "\\par\\fs24 ");
+                do_debug = 1;
                 break;
+            case eod:
             case soft:
-                /* ignore soft-CR */
+                /* ignore soft-CR and end-of-doc marker */
+                do_debug = 1;
                 break;
             case lbrack: 
                 /* check for left curly bracket (special RTF char) */
                 fprintf(out_file, "\\%c", parse_ch);
+                do_debug = 1;
                 break;
             case rbrack:
                 /* check for right curly bracket (special RTF char) */
@@ -148,11 +167,19 @@ void main(int argc, char *argv[]) {
             case bslash: 
                 /* check for backslash (special RTF char) */
                 fprintf(out_file, "\\%c", parse_ch);
+                do_debug = 1;
                 break;
             default:
                 fprintf(out_file, "%c", parse_ch);
                 break;
-        } /* end of switch */
+        }
+         /* end of switch */
+
+#ifdef DEBUG
+            if (do_debug) debug(parse_ch, char_count);
+#endif
+        char_count++;
+        do_debug = 0;
     }
 
     /* this little hack goes back and inserts a } to end the rtf file,
@@ -166,7 +193,7 @@ void main(int argc, char *argv[]) {
     fclose(in_file);
     fclose(out_file);
 
-    printf("conversion successful \n");
+    printf("Conversion successful\n");
 
 } /* end of main */
 
@@ -175,8 +202,10 @@ void main(int argc, char *argv[]) {
 int conv_wp(unsigned char code, char *out_str, int *first_time) {
 
     int a;
-    static int f_code[(num_of_fcodes + 1)]; /* this holds the status of any pending formating
-                                            the layout is : fcode[x] with x as per the defines below */
+    /* this holds the status of any pending formating
+    the layout is : fcode[x] with x as per the defines below */
+    static int f_code[(num_of_fcodes + 1)]; 
+                                            
     #define b 0  /* bold */
     #define i 1  /* italic */
     #define u 2  /* underline */
@@ -186,7 +215,8 @@ int conv_wp(unsigned char code, char *out_str, int *first_time) {
 
     /* init array to clear (all zeros) if this first time being called */
     if (*first_time == 1) {
-        *first_time = 0; /* reset so not done again during this execution */
+        /* reset so not done again during this execution */
+        *first_time = 0; 
         a = 0;
         while (f_code[a] != 0) {
             f_code[a] = 0;
@@ -197,38 +227,36 @@ int conv_wp(unsigned char code, char *out_str, int *first_time) {
     /* this switch will either set a format type as pending
     or clear a pending format for the paired format codes,
     otherwise it will simply set a hard-CR and will ignore a soft CR */
-
     switch(code) {
         case bold:
-            if (f_code[b] == 1) f_code[b] = 0;
-            else f_code[b] = 1;
+            f_code[b] = f_code[b] == 1 ? 0 : 1;
             break;
         case ital:
-            if (f_code[i] == 1) f_code[i] = 0;
-            else f_code[i] = 1;
+            f_code[i] = f_code[i] == 1 ? 0 : 1;
             break;
         case undr:
-            if (f_code[u] == 1) f_code[u] = 0;
-            else f_code[u] = 1;
+            f_code[u] = f_code[u] == 1 ? 0 : 1;
             break;
         case subs:
-            if (f_code[s] == 1) f_code[s] = 0;
-            else f_code[s] = 1;
+            f_code[s] = f_code[s] == 1 ? 0 : 1;
             break;
         case sups:
-            if (f_code[p] == 1) f_code[p] = 0;
-            else f_code[p] = 1;
+            f_code[p] = f_code[p] == 1 ? 0 : 1;
             break;
         case larg:
-            if (f_code[l] == 1) f_code[l] = 0;
-            else f_code[l] = 1;  
+            f_code[l] = f_code[l] == 1 ? 0 : 1;
             break;
+        case spc:
+            // This appears to be an inserted space for justification
+            strcat(out_str, "");
+            return 0;
         default:
-            return 1; /* return 1 to indicate unrecognised format code */
+            /* return 1 to indicate unrecognised format code */
+            return 1; 
     } /* end of switch */
 
     /* adds the relevant RTF format codes to the format string code_str that */
-    strcpy(out_str,"\\plain");
+    strcpy(out_str, "\\plain");
     if (f_code[b] == 1) strcat(out_str, "\\b");
     if (f_code[i] == 1) strcat(out_str, "\\i");
     if (f_code[u] == 1) strcat(out_str, "\\ul");
@@ -237,7 +265,8 @@ int conv_wp(unsigned char code, char *out_str, int *first_time) {
     if (f_code[l] == 1) strcat(out_str, "\\fs28 ");
     else strcat(out_str, "\\fs24 ");
 
-    return 0;  /* return zero to indicate successful completion of function */
+    /* return zero to indicate successful completion of function */
+    return 0;  
 
 } /* end of function conv_wp */
 
@@ -246,7 +275,7 @@ int conv_wp(unsigned char code, char *out_str, int *first_time) {
 /* removes ext (if any) from a given filename string and passes back as
    out_name 
  */
-void remove_ext(char *in_name,char *out_name) {
+void remove_ext(char *in_name, char *out_name) {
 
     int cnt=0;
     while ((in_name[cnt] != '.') && (in_name[cnt] != '\0')) {
@@ -266,11 +295,82 @@ void remove_ext(char *in_name,char *out_name) {
 
 /* ===================================================================== */
 
+#ifdef DEBUG
+void debug(char code, int location) {
+
+    static int eod_reported = 0;
+    char message[32] = {0};
+    char item[32] = {0};
+    
+    switch(code) {
+        case bold:
+            sprintf(item, "bold");
+            break;
+        case ital:
+            sprintf(item, "italic");
+            break;
+        case undr:
+            sprintf(item, "underline");
+            break;
+        case subs:
+            sprintf(item, "subscript");
+            break;
+        case sups:
+            sprintf(item, "superscript");
+            break;
+        case larg:
+            sprintf(item, "large text");
+            break;
+        case soft:
+            sprintf(item, "soft CR");
+            break;
+        case lnfd:
+            sprintf(item, "line feed");
+            break;
+        case lbrack:
+            sprintf(item, "left brace");
+            break;
+        case rbrack:
+            sprintf(item, "right brace");
+            break;
+        case bslash:
+            sprintf(item, "backslash");
+            break;
+        case spc:
+            sprintf(item, "padded space");
+            break;
+        case eod:
+            if (!(eod_reported)) {
+                sprintf(item, "end of doc");
+                eod_reported = 1;
+            } else {
+                return;
+            }
+            break;
+        default:
+            break;
+    }
+
+    if (strlen(item) > 0) {
+        sprintf(message, "Found %s marker at location %d", item, location);
+    } else {
+        sprintf(message, "Found code 0x%02X at location %d", code, location);
+    }
+
+    debug_out(message);
+}
+
+void debug_out(char* message) {
+
+    printf("[DEBUG] %s\n", message);
+}
+#endif
+
+/* ===================================================================== */
+
 void help_scr(void) {
 
-    printf("\n");
-    printf("Notepad WP to RTF converter \n");
-    printf("by Maksim Lin, version %s \n", version);
-    printf("usage: np-rtf filename \n");
-    printf("\n");
+    printf("\nNotepad WP to RTF converter\n");
+    printf("by Maksim Lin, version %s\n", version);
+    printf("usage: notepad2text {filename}\n\n");
 }
