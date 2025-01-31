@@ -1,0 +1,17 @@
+This is code test document, first line.
+
+This is one line of normal text.
+This is one line of bold text.
+This is one line of italic text.
+This is one line of underlined text.
+This is one line of all three types of text format.
+
+This is supposed to be one paragraph of normal text used to test the convertors ability to deal with blocks of text which are longer than one line.  Also included in this paragraph are words which are BOLD and which are ITALIC and UNDERLINED and of course a combination of ALL THREE types of text. 
+
+This is an example of superscript text.
+This is an example of subscript text.
+This is an example of enlarged text.
+
+This is a check of special RTF character handling , ,  .
+
+And this is the last line of text and is normal format.

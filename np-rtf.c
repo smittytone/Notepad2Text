@@ -16,7 +16,9 @@ Changes :
         - added checking and proper handling for \,{ & } characters.
     - 1.1
         - Fix to build under Linux/macOS.
-        - Add optional debug output
+        - Use Linux/macOS newlines style.
+        - Add `--text` flag for text only output.
+        - Add optional debug output.
         - Code tidy.
 =========================================================================
 */
@@ -53,6 +55,7 @@ Changes :
 #define escd 0x05 /* escape code for format code characters */
 #define soft 0x8A /* "soft" carriage-return (occurs after a CR character) */
 #define lnfd 0x0A /* line-feed (occurs after a CR char to indicate end of line */
+#define cret 0x0D
 #define eod  0x1A /* end of doc marker - usually get a line of these */
 
 /* Special RTF characters: */
@@ -65,7 +68,7 @@ Changes :
 #define max_format_string 25
 
 /* Allow for debugging, or comment out */
-#define DEBUG 1
+//#define DEBUG 1
 
 int conv_wp(unsigned char code, char *out_str, int *first_time);
 void remove_ext(char *in_name, char *out_name);
@@ -84,6 +87,7 @@ int main(int argc, char *argv[]) {
     unsigned char parse_ch;
     /* Used to tell `conv_wp()` that it's being called for the first time */
     int first = 1;
+    int text_only = 0;
 
     /* ============ start of filenames input section ================ */
 
@@ -92,34 +96,53 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
-    if (argc > 2) {
+    if (argc > 3) {
         printf("[Error] Too many command line arguments\n");
         help_scr();
         exit(1);
     }
-
-    if (argc == 2) {
-        in_file = fopen(argv[1], "r");
-        if (in_file == NULL) {
-            /* check for error in fopen */
-            printf("[Error] Failed to open input file\n");
-            exit(1);
-        }
-
-        remove_ext(argv[1], out_filename);
-        strcat(out_filename, ".rtf");
-        out_file = fopen(out_filename, "w");
-        if (out_file == NULL) {
-            /* check for error in fopen */
-            printf("[Error] Failed to open output file\n");
+ 
+    int path_arg = 99;
+    if (argc == 3) {
+        if (strcmp(argv[1], "-t")== 0 || strcmp(argv[1], "--text") == 0) {
+            path_arg = 2;
+            text_only = 1;
+        } else if (strcmp(argv[2], "-t") == 0 || strcmp(argv[2], "--text") == 0) {
+            path_arg = 1;
+            text_only = 1;
+        } else {
+            printf("[Error] Too many or incorrect command line arguments\n");
+            help_scr();
             exit(1);
         }
     }
 
+    if (argc == 2) {
+        path_arg = 1;
+    }
+
+    in_file = fopen(argv[path_arg], "r");
+    if (in_file == NULL) {
+        /* check for error in fopen */
+        printf("[Error] Failed to open input file\n");
+        exit(1);
+    }
+
+    remove_ext(argv[path_arg], out_filename);
+    strcat(out_filename, text_only ? ".txt" : ".rtf");
+    out_file = fopen(out_filename, "w");
+    if (out_file == NULL) {
+        /* check for error in fopen */
+        printf("[Error] Failed to open output file\n");
+        exit(1);
+    }
+
     /* ============ end of filenames input section ================ */
 
-    fprintf(out_file,doc_start);  /* standard RTF begin doc codes */
-    fprintf(out_file,text_start);
+    if (text_only == 0) {
+        fprintf(out_file, doc_start);  /* standard RTF begin doc codes */
+        fprintf(out_file, text_start);
+    }
 
     int char_count = 0;
     int do_debug = 0;
@@ -134,39 +157,46 @@ int main(int argc, char *argv[]) {
 #ifdef DEBUG
                 debug(parse_ch, char_count);
 #endif
-
-                /* convert & check return value for error from conv_wp() */
-                if (!(conv_wp(parse_ch, code_str, &first))) {
-                    /* write RTF format string to file */
-                    fprintf(out_file, "%s", code_str);
-                } else {
-                    printf("[Warning] Unknown code found (0x%02X) at %d, output may be corrupted\n", parse_ch, char_count);
-                    fprintf(out_file, "%s", code_str);
+                if (text_only == 0) {
+                    /* convert & check return value for error from conv_wp() */
+                    if (!(conv_wp(parse_ch, code_str, &first))) {
+                        /* write RTF format string to file */
+                        fprintf(out_file, "%s", code_str);
+                    } else {
+                        printf("[Warning] Unknown code found (0x%02X) at %d, output may be corrupted\n", parse_ch, char_count);
+                        fprintf(out_file, "%s", code_str);
+                    }
                 }
                 break;
                 /* end of case escd */
             case lnfd:
                 /* fs24 insures correct initial font size */
-                fprintf(out_file, "\\par\\fs24 ");
+                if (text_only == 0) {
+                    fprintf(out_file, "\\par\\fs24 ");
+                } else {
+                    fprintf(out_file, "%c", lnfd);
+                }
                 do_debug = 1;
                 break;
             case eod:
+            case cret:
             case soft:
+            case 0xFF:
                 /* ignore soft-CR and end-of-doc marker */
                 do_debug = 1;
                 break;
             case lbrack:
                 /* check for left curly bracket (special RTF char) */
-                fprintf(out_file, "\\%c", parse_ch);
+                if (text_only == 0) fprintf(out_file, "\\%c", parse_ch);
                 do_debug = 1;
                 break;
             case rbrack:
                 /* check for right curly bracket (special RTF char) */
-                fprintf(out_file, "\\%c", parse_ch);
+                if (text_only == 0) fprintf(out_file, "\\%c", parse_ch);
                 break;
             case bslash:
                 /* check for backslash (special RTF char) */
-                fprintf(out_file, "\\%c", parse_ch);
+                if (text_only == 0) fprintf(out_file, "\\%c", parse_ch);
                 do_debug = 1;
                 break;
             default:
@@ -186,9 +216,10 @@ int main(int argc, char *argv[]) {
     before the end of file marker which for some reason gets written in
     before the fclose operation, probably being picked up from the end of
     the Notepad file ?? */
-
-    fseek(out_file, -2, SEEK_CUR);
-    fprintf(out_file, "}");
+    if (text_only == 0) {
+        fseek(out_file, -2, SEEK_CUR);
+        fprintf(out_file, "}");
+    }
 
     fclose(in_file);
     fclose(out_file);
@@ -374,7 +405,9 @@ void output_debug(char* message) {
 
 void help_scr(void) {
 
-    printf("\nNotepad WP to RTF converter\n");
-    printf("by Maksim Lin, version %s\n", version);
-    printf("usage: notepad2text {filename}\n\n");
+    printf("\nAmstrad NC100 WP to RTF/TXT converter\n");
+    printf("by Maksim Lin and Tony Smith, version %s\n", version);
+    printf("\nUsage: notepad2text [--text] /path/to/nc100/word/file\n\n");
+    printf("Options:\n");
+    printf("  -t / --text    Output plain text rather than RTF.\n\n");
 }
