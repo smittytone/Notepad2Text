@@ -8,7 +8,7 @@ Maksim's code was written in C and targeted Windows machines. I have modified hi
 
 Being something of a code-formatting martinet, I have taken the opportunity to tidy up Maksim's code. I have also added optional plain text output (handy if, like me, you're pasting the result into web page or text editor) and enforced use of the Linux/macOS new line format: ie. `CRLF` to `LF`. It's not hard to hack back if you're a Windows user.
 
-I have released my version, renamed *notepad2text* to align with [*word2text*](https://github.com/smittytone/Word2Text), under the MIT Licence. Maksim's original code contained no licensing info, just the code.
+I have released my version, renamed *notepad2text* to align with [*word2text*](https://github.com/smittytone/Word2Text).
 
 ## Compilation
 
