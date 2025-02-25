@@ -1,6 +1,8 @@
 # Notepad2Text
 
-This code is an update of a 1990s program for converting [Amstrad NC100 Notepad](https://en.wikipedia.org/wiki/Amstrad_NC100) word processor files to RTF written by Maksim Lin, then a student or staff member at Swindon University.
+This code is an update of a 1990s program for converting [Amstrad NC100 Notepad](https://en.wikipedia.org/wiki/Amstrad_NC100) word processor files to RTF written by Maksim Lin, then a student at Swinburne University in Melbourne, Australia. You can [find his original zip file here](https://www.ncus.org.uk/utils.htm#nc_to_rtf).
+
+![Amstrad NC100 Notepad. Image (c) 2025, Tony Smith. All rights reserved](./images/img_0157.webp)
 
 Maksim's code was written in C and targeted Windows machines. I have modified his code very slightly to allow it to be built on a Unix machine: my Raspberry Pi 500 running Linux. I have not tried to compile the updated code under any version of Windows because I'm not able to do so. I'm happy to consider pull requests that re-enable Windows usage if I have broken it. Please target the `develop` branch.
 
