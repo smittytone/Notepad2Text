@@ -16,7 +16,7 @@ Changes :
         - added checking and proper handling for \,{ & } characters.
     - 1.1
         - Fix to build under Linux/macOS.
-        - Use Linux/macOS newlines style.
+        - Use Linux/macOS newline style.
         - Add `--text` flag for text only output.
         - Add optional debug output.
         - Code tidy.
@@ -27,7 +27,7 @@ Changes :
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
-//#include <process.h>  /* Windows only? I', focusing on Linux (TS) */
+//#include <process.h>  /* Windows only? I'm focusing on Linux (TS) */
 
 #define version "1.1" /* make sure to keep this up to date*/
 
@@ -68,10 +68,11 @@ Changes :
 #define max_format_string 25
 
 /* Allow for debugging, or comment out */
-//#define DEBUG 1
+#define DEBUG 1
 
-int conv_wp(unsigned char code, char *out_str, int *first_time);
+int conv_wp(unsigned char code, char *out_str, int *first_time, int output_md);
 void remove_ext(char *in_name, char *out_name);
+int md_flag_value(int current);
 void debug(int code, int location);
 void output_debug(char* message);
 void help_scr(void);
@@ -88,6 +89,7 @@ int main(int argc, char *argv[]) {
     /* Used to tell `conv_wp()` that it's being called for the first time */
     int first = 1;
     int text_only = 0;
+    int output_md = 0;
 
     /* ============ start of filenames input section ================ */
 
@@ -101,15 +103,21 @@ int main(int argc, char *argv[]) {
         help_scr();
         exit(1);
     }
- 
+
     int path_arg = 99;
     if (argc == 3) {
-        if (strcmp(argv[1], "-t" )== 0 || strcmp(argv[1], "--text") == 0) {
+        if (strcmp(argv[1], "-t" ) == 0 || strcmp(argv[1], "--text") == 0) {
             path_arg = 2;
             text_only = 1;
         } else if (strcmp(argv[2], "-t") == 0 || strcmp(argv[2], "--text") == 0) {
             path_arg = 1;
             text_only = 1;
+        } else if (strcmp(argv[1], "-m" ) == 0 || strcmp(argv[1], "--markdown") == 0) {
+            path_arg = 2;
+            output_md = 1;
+        } else if (strcmp(argv[2], "-m") == 0 || strcmp(argv[2], "--markdown") == 0) {
+            path_arg = 1;
+            output_md = 1;
         } else {
             printf("[Error] Too many or incorrect command line arguments\n");
             help_scr();
@@ -121,6 +129,12 @@ int main(int argc, char *argv[]) {
         path_arg = 1;
     }
 
+    // FROM 1.2
+    // Check for clashing flags (default to text)
+    if (output_md == 1 && text_only == 1) {
+        output_md = 0;
+    }
+
     in_file = fopen(argv[path_arg], "r");
     if (in_file == NULL) {
         /* check for error in fopen */
@@ -129,7 +143,16 @@ int main(int argc, char *argv[]) {
     }
 
     remove_ext(argv[path_arg], out_filename);
-    strcat(out_filename, text_only ? ".txt" : ".rtf");
+
+    // FROM 1.2
+    if (text_only == 1) {
+        strcat(out_filename, ".txt");
+    } else if (output_md == 1) {
+        strcat(out_filename, ".markdown");
+    } else {
+        strcat(out_filename, ".rtf");
+    }
+
     out_file = fopen(out_filename, "w");
     if (out_file == NULL) {
         /* check for error in fopen */
@@ -139,7 +162,7 @@ int main(int argc, char *argv[]) {
 
     /* ============ end of filenames input section ================ */
 
-    if (text_only == 0) {
+    if (text_only == 0 && output_md == 0) {
         fprintf(out_file, doc_start);  /* standard RTF begin doc codes */
         fprintf(out_file, text_start);
     }
@@ -159,9 +182,10 @@ int main(int argc, char *argv[]) {
 #endif
                 if (text_only == 0) {
                     /* convert & check return value for error from conv_wp() */
-                    if (!(conv_wp(parse_ch, code_str, &first))) {
+                    if (!(conv_wp(parse_ch, code_str, &first, output_md))) {
                         /* write RTF format string to file */
                         fprintf(out_file, "%s", code_str);
+                        if (output_md == 1) code_str[0] = 0;
                     } else {
                         printf("[Warning] Unknown code found (0x%02X) at %d, output may be corrupted\n", parse_ch, char_count);
                         fprintf(out_file, "%s", code_str);
@@ -171,7 +195,7 @@ int main(int argc, char *argv[]) {
                 /* end of case escd */
             case lnfd:
                 /* fs24 insures correct initial font size */
-                if (text_only == 0) {
+                if (text_only == 0 && output_md == 0) {
                     fprintf(out_file, "\\par\\fs24 ");
                 } else {
                     fprintf(out_file, "%c", lnfd);
@@ -187,16 +211,16 @@ int main(int argc, char *argv[]) {
                 break;
             case lbrack:
                 /* check for left curly bracket (special RTF char) */
-                if (text_only == 0) fprintf(out_file, "\\%c", parse_ch);
+                if (text_only == 0 && output_md == 0) fprintf(out_file, "\\%c", parse_ch);
                 do_debug = 1;
                 break;
             case rbrack:
                 /* check for right curly bracket (special RTF char) */
-                if (text_only == 0) fprintf(out_file, "\\%c", parse_ch);
+                if (text_only == 0 && output_md == 0) fprintf(out_file, "\\%c", parse_ch);
                 break;
             case bslash:
                 /* check for backslash (special RTF char) */
-                if (text_only == 0) fprintf(out_file, "\\%c", parse_ch);
+                if (text_only == 0 && output_md == 0) fprintf(out_file, "\\%c", parse_ch);
                 do_debug = 1;
                 break;
             default:
@@ -216,7 +240,7 @@ int main(int argc, char *argv[]) {
     before the end of file marker which for some reason gets written in
     before the fclose operation, probably being picked up from the end of
     the Notepad file ?? */
-    if (text_only == 0) {
+    if (text_only == 0 && output_md == 0) {
         fseek(out_file, -2, SEEK_CUR);
         fprintf(out_file, "}");
     }
@@ -231,7 +255,7 @@ int main(int argc, char *argv[]) {
 
 /* =================== FUNCTIONS ============================= */
 
-int conv_wp(unsigned char code, char *out_str, int *first_time) {
+int conv_wp(unsigned char code, char *out_str, int *first_time, int output_md) {
 
     int a;
     /* this holds the status of any pending formating
@@ -259,43 +283,74 @@ int conv_wp(unsigned char code, char *out_str, int *first_time) {
     /* this switch will either set a format type as pending
     or clear a pending format for the paired format codes,
     otherwise it will simply set a hard-CR and will ignore a soft CR */
-    switch(code) {
-        case bold:
-            f_code[b] = f_code[b] == 1 ? 0 : 1;
-            break;
-        case ital:
-            f_code[i] = f_code[i] == 1 ? 0 : 1;
-            break;
-        case undr:
-            f_code[u] = f_code[u] == 1 ? 0 : 1;
-            break;
-        case subs:
-            f_code[s] = f_code[s] == 1 ? 0 : 1;
-            break;
-        case sups:
-            f_code[p] = f_code[p] == 1 ? 0 : 1;
-            break;
-        case larg:
-            f_code[l] = f_code[l] == 1 ? 0 : 1;
-            break;
-        case spc:
-            // This appears to be an inserted space for justification
-            strcat(out_str, "");
-            return 0;
-        default:
-            /* return 1 to indicate unrecognised format code */
-            return 1;
-    } /* end of switch */
+    if (output_md == 0) {
+        switch(code) {
+            case bold:
+                f_code[b] = f_code[b] == 1 ? 0 : 1;
+                break;
+            case ital:
+                f_code[i] = f_code[i] == 1 ? 0 : 1;
+                break;
+            case undr:
+                f_code[u] = f_code[u] == 1 ? 0 : 1;
+                break;
+            case subs:
+                f_code[s] = f_code[s] == 1 ? 0 : 1;
+                break;
+            case sups:
+                f_code[p] = f_code[p] == 1 ? 0 : 1;
+                break;
+            case larg:
+                f_code[l] = f_code[l] == 1 ? 0 : 1;
+                break;
+            case spc:
+                // This appears to be an inserted space for justification
+                strcat(out_str, "");
+                return 0;
+            default:
+                /* return 1 to indicate unrecognised format code */
+                return 1;
+        } /* end of switch */
+    } else {
+        switch(code) {
+            case bold:
+                printf("BOLD %s\n", f_code[b] == 0 ? "OPEN" : "CLOSE");
+                f_code[b] = f_code[b] + 1;
+                break;
+            case ital:
+                f_code[i] = f_code[i] + 1;
+                break;
+            case spc:
+                // This appears to be an inserted space for justification
+                strcat(out_str, "");
+                return 0;
+            default:
+                /* return 1 to indicate unrecognised format code */
+                return 1;
+        }
+    }
 
     /* adds the relevant RTF format codes to the format string code_str that */
-    strcpy(out_str, "\\plain");
-    if (f_code[b] == 1) strcat(out_str, "\\b");
-    if (f_code[i] == 1) strcat(out_str, "\\i");
-    if (f_code[u] == 1) strcat(out_str, "\\ul");
-    if (f_code[s] == 1) strcat(out_str, "\\dn");
-    if (f_code[p] == 1) strcat(out_str, "\\up");
-    if (f_code[l] == 1) strcat(out_str, "\\fs28 ");
-    else strcat(out_str, "\\fs24 ");
+    if (output_md == 0) {
+        strcpy(out_str, "\\plain");
+        if (f_code[b] == 1) strcat(out_str, "\\b");
+        if (f_code[i] == 1) strcat(out_str, "\\i");
+        if (f_code[u] == 1) strcat(out_str, "\\ul");
+        if (f_code[s] == 1) strcat(out_str, "\\dn");
+        if (f_code[p] == 1) strcat(out_str, "\\up");
+        if (f_code[l] == 1) strcat(out_str, "\\fs28 ");
+        else strcat(out_str, "\\fs24 ");
+    } else {
+        if (f_code[b] > 0) {
+            strcat(out_str, "**");
+            if (f_code[b] >= 2) f_code[b] = 0;
+        }
+
+        if (f_code[i] > 0) {
+            strcat(out_str, "_");
+            if (f_code[i] >= 2) f_code[i] = 0;
+        }
+    }
 
     /* return zero to indicate successful completion of function */
     return 0;
@@ -324,6 +379,15 @@ void remove_ext(char *in_name, char *out_name) {
         out_name[cnt] = in_name[cnt];
     }
 }
+
+/* Increase the value `current` by one, unless it's at 2, in which case
+   make it zero.
+ */
+int md_flag_value(int current) {
+
+    return (current + 1) % 3;
+}
+
 
 /* ===================================================================== */
 
