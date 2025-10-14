@@ -1,4 +1,4 @@
-# Notepad2Text
+# Notepad2Text 1.2
 
 This code is an update of a 1990s program for converting [Amstrad NC100 Notepad](https://en.wikipedia.org/wiki/Amstrad_NC100) word processor files to RTF written by Maksim Lin, then a student at Swinburne University in Melbourne, Australia. You can [find his original zip file here](https://www.ncus.org.uk/utils.htm#nc_to_rtf).
 

@@ -20,6 +20,8 @@ Changes :
         - Add `--text` flag for text only output.
         - Add optional debug output.
         - Code tidy.
+    - 1.2
+        - Add Markdown output.
 =========================================================================
 */
 
@@ -29,7 +31,7 @@ Changes :
 #include <ctype.h>
 //#include <process.h>  /* Windows only? I'm focusing on Linux (TS) */
 
-#define version "1.1" /* make sure to keep this up to date*/
+#define version "1.2" /* make sure to keep this up to date*/
 
 #define doc_start  "{\\rtf1\\ansi{\\fonttbl{\\f0\\fs24 Times New Roman;}}\n"
 #define text_start "\\pard\\plain\\fs24 "
@@ -312,9 +314,10 @@ int conv_wp(unsigned char code, char *out_str, int *first_time, int output_md) {
                 return 1;
         } /* end of switch */
     } else {
+        /* markdown pathway
+           Set value of `f_code` to 1 on opening, 2 on closing */
         switch(code) {
             case bold:
-                printf("BOLD %s\n", f_code[b] == 0 ? "OPEN" : "CLOSE");
                 f_code[b] = f_code[b] + 1;
                 break;
             case ital:
@@ -469,9 +472,10 @@ void output_debug(char* message) {
 
 void help_scr(void) {
 
-    printf("\nAmstrad NC100 WP to RTF/TXT converter\n");
+    printf("Amstrad NC100 WP to RTF/TXT converter\n");
     printf("by Maksim Lin and Tony Smith, version %s\n", version);
     printf("\nUsage: notepad2text [--text] /path/to/nc100/word/file\n\n");
     printf("Options:\n");
-    printf("  -t / --text    Output plain text rather than RTF.\n\n");
+    printf("  -t / --text      Output plain text rather than RTF.\n");
+    printf("  -m / --markdown  Output Markdown rather than RTF.\n");
 }
