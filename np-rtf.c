@@ -3,17 +3,17 @@
 Amstrad Notepad WordProcessor to RTF conversion utility
 
 Author 	: Maksim Lin
-Started	: 13/11/1996
-Updated : 25/01/2025 by Tony Smith (@smittytone)
-Version	: 1.1
+Started	: 13/11/1996 (1.0)
+Updated : 25/01/2025 (1.1) by Tony Smith (@smittytone)
+          27/10/2025 (1.2) by Tony Smith
 
 Changes :
     - 1.0
-        - added commandline input with auto output filename creation
+        - Added commandline input with auto output filename creation
           using remove_ext() & removed interactive input.
-        - added simple help screen.
-        - changed error message for unrecognised NP format code.
-        - added checking and proper handling for \,{ & } characters.
+        - Added simple help screen.
+        - Changed error message for unrecognised NP format code.
+        - Added checking and proper handling for \,{ & } characters.
     - 1.1
         - Fix to build under Linux/macOS.
         - Use Linux/macOS newline style.
@@ -21,7 +21,7 @@ Changes :
         - Add optional debug output.
         - Code tidy.
     - 1.2
-        - Add Markdown output.
+        - Add rudimentary Markdown output.
 =========================================================================
 */
 
@@ -41,7 +41,6 @@ Changes :
    & the enlarge font is 14 point */
 
 /* Notepad ASCII Format codes: (paired) */
-
 #define bold 0xE2 /* bold */
 #define ital 0xE9 /* italic */
 #define undr 0xF5 /* underline */
@@ -53,15 +52,13 @@ Changes :
 #define num_of_fcodes 6 /* number of paired format codes */
 
 /* Notepad ASCII Format codes: (non-paired) */
-
-#define escd 0x05 /* escape code for format code characters */
-#define soft 0x8A /* "soft" carriage-return (occurs after a CR character) */
-#define lnfd 0x0A /* line-feed (occurs after a CR char to indicate end of line */
+#define escd 0x05 /* Escape code for format code characters */
+#define soft 0x8A /* "Soft" carriage-return (occurs after a CR character) */
+#define lnfd 0x0A /* Line-feed (occurs after a CR char to indicate end of line */
 #define cret 0x0D
-#define eod  0x1A /* end of doc marker - usually get a line of these */
+#define eod  0x1A /* End of doc marker - usually get a line of these */
 
 /* Special RTF characters: */
-
 #define lbrack '{'
 #define rbrack '}'
 #define bslash '\\'
@@ -70,7 +67,7 @@ Changes :
 #define max_format_string 25
 
 /* Allow for debugging, or comment out */
-#define DEBUG 1
+//#define DEBUG 1
 
 int conv_wp(unsigned char code, char *out_str, int *first_time, int output_md);
 void remove_ext(char *in_name, char *out_name);
@@ -139,7 +136,7 @@ int main(int argc, char *argv[]) {
 
     in_file = fopen(argv[path_arg], "r");
     if (in_file == NULL) {
-        /* check for error in fopen */
+        /* Check for error in fopen */
         printf("[Error] Failed to open input file\n");
         exit(1);
     }
@@ -157,7 +154,7 @@ int main(int argc, char *argv[]) {
 
     out_file = fopen(out_filename, "w");
     if (out_file == NULL) {
-        /* check for error in fopen */
+        /* Check for error in fopen */
         printf("[Error] Failed to open output file\n");
         exit(1);
     }
@@ -165,7 +162,7 @@ int main(int argc, char *argv[]) {
     /* ============ end of filenames input section ================ */
 
     if (text_only == 0 && output_md == 0) {
-        fprintf(out_file, doc_start);  /* standard RTF begin doc codes */
+        fprintf(out_file, doc_start);  /* Standard RTF begin doc codes */
         fprintf(out_file, text_start);
     }
 
@@ -174,18 +171,18 @@ int main(int argc, char *argv[]) {
     while (!(feof(in_file))) {
         parse_ch = getc(in_file);
         switch(parse_ch) {
-            /* check for CR's or ESC code */
+            /* Check for CR's or ESC code */
             case escd:
-                /* read the char after the esc code or CR */
+                /* Read the char after the esc code or CR */
                 char_count++;
                 parse_ch = getc(in_file);
 #ifdef DEBUG
                 debug(parse_ch, char_count);
 #endif
                 if (text_only == 0) {
-                    /* convert & check return value for error from conv_wp() */
+                    /* Convert & check return value for error from conv_wp() */
                     if (!(conv_wp(parse_ch, code_str, &first, output_md))) {
-                        /* write RTF format string to file */
+                        /* Write RTF format string to file */
                         fprintf(out_file, "%s", code_str);
                         if (output_md == 1) code_str[0] = 0;
                     } else {
@@ -194,7 +191,7 @@ int main(int argc, char *argv[]) {
                     }
                 }
                 break;
-                /* end of case escd */
+                /* End of case escd */
             case lnfd:
                 /* fs24 insures correct initial font size */
                 if (text_only == 0 && output_md == 0) {
@@ -208,20 +205,20 @@ int main(int argc, char *argv[]) {
             case cret:
             case soft:
             case 0xFF:
-                /* ignore soft-CR and end-of-doc marker */
+                /* Ignore soft-CR and end-of-doc marker */
                 do_debug = 1;
                 break;
             case lbrack:
-                /* check for left curly bracket (special RTF char) */
+                /* Check for left curly bracket (special RTF char) */
                 if (text_only == 0 && output_md == 0) fprintf(out_file, "\\%c", parse_ch);
                 do_debug = 1;
                 break;
             case rbrack:
-                /* check for right curly bracket (special RTF char) */
+                /* Check for right curly bracket (special RTF char) */
                 if (text_only == 0 && output_md == 0) fprintf(out_file, "\\%c", parse_ch);
                 break;
             case bslash:
-                /* check for backslash (special RTF char) */
+                /* Check for backslash (special RTF char) */
                 if (text_only == 0 && output_md == 0) fprintf(out_file, "\\%c", parse_ch);
                 do_debug = 1;
                 break;
@@ -229,7 +226,7 @@ int main(int argc, char *argv[]) {
                 fprintf(out_file, "%c", parse_ch);
                 break;
         }
-         /* end of switch */
+         /* End of switch */
 
 #ifdef DEBUG
             if (do_debug) debug(parse_ch, char_count);
@@ -238,7 +235,7 @@ int main(int argc, char *argv[]) {
         do_debug = 0;
     }
 
-    /* this little hack goes back and inserts a } to end the rtf file,
+    /* This little hack goes back and inserts a } to end the rtf file,
     before the end of file marker which for some reason gets written in
     before the fclose operation, probably being picked up from the end of
     the Notepad file ?? */
@@ -249,18 +246,17 @@ int main(int argc, char *argv[]) {
 
     fclose(in_file);
     fclose(out_file);
-
     printf("Conversion successful\n");
     exit(0);
 
-} /* end of main */
+} /* End of main */
 
 /* =================== FUNCTIONS ============================= */
 
 int conv_wp(unsigned char code, char *out_str, int *first_time, int output_md) {
 
     int a;
-    /* this holds the status of any pending formating
+    /* This holds the status of any pending formating
     the layout is : fcode[x] with x as per the defines below */
     static int f_code[(num_of_fcodes + 1)];
 
@@ -271,9 +267,9 @@ int conv_wp(unsigned char code, char *out_str, int *first_time, int output_md) {
     #define p 4  /* superscript */
     #define l 5  /* enlarged */
 
-    /* init array to clear (all zeros) if this first time being called */
+    /* Init array to clear (all zeros) if this first time being called */
     if (*first_time == 1) {
-        /* reset so not done again during this execution */
+        /* Reset so not done again during this execution */
         *first_time = 0;
         a = 0;
         while (f_code[a] != 0) {
@@ -282,7 +278,7 @@ int conv_wp(unsigned char code, char *out_str, int *first_time, int output_md) {
         }
     }
 
-    /* this switch will either set a format type as pending
+    /* This switch will either set a format type as pending
     or clear a pending format for the paired format codes,
     otherwise it will simply set a hard-CR and will ignore a soft CR */
     if (output_md == 0) {
@@ -306,15 +302,15 @@ int conv_wp(unsigned char code, char *out_str, int *first_time, int output_md) {
                 f_code[l] = f_code[l] == 1 ? 0 : 1;
                 break;
             case spc:
-                // This appears to be an inserted space for justification
+                /* This appears to be an inserted space for justification */
                 strcat(out_str, "");
                 return 0;
             default:
-                /* return 1 to indicate unrecognised format code */
+                /* Return 1 to indicate unrecognised format code */
                 return 1;
-        } /* end of switch */
+        } /* End of switch */
     } else {
-        /* markdown pathway
+        /* Markdown pathway
            Set value of `f_code` to 1 on opening, 2 on closing */
         switch(code) {
             case bold:
@@ -323,17 +319,18 @@ int conv_wp(unsigned char code, char *out_str, int *first_time, int output_md) {
             case ital:
                 f_code[i] = f_code[i] + 1;
                 break;
+            case larg:
+                f_code[l] = f_code[l] + 1;
+                break;
             case spc:
-                // This appears to be an inserted space for justification
                 strcat(out_str, "");
                 return 0;
             default:
-                /* return 1 to indicate unrecognised format code */
                 return 1;
         }
     }
 
-    /* adds the relevant RTF format codes to the format string code_str that */
+    /* Adds the relevant RTF or MD format codes to the format string code_str that */
     if (output_md == 0) {
         strcpy(out_str, "\\plain");
         if (f_code[b] == 1) strcat(out_str, "\\b");
@@ -344,41 +341,49 @@ int conv_wp(unsigned char code, char *out_str, int *first_time, int output_md) {
         if (f_code[l] == 1) strcat(out_str, "\\fs28 ");
         else strcat(out_str, "\\fs24 ");
     } else {
+        /* Add Markdown Bold in and out */
         if (f_code[b] > 0) {
             strcat(out_str, "**");
             if (f_code[b] >= 2) f_code[b] = 0;
         }
 
+        /* Add Markdown Italic in and out */
         if (f_code[i] > 0) {
             strcat(out_str, "_");
             if (f_code[i] >= 2) f_code[i] = 0;
         }
+
+        /* Add Markdown H1 in */
+        if (f_code[l] == 1) {
+            strcat(out_str, "# ");
+            if (f_code[l] >= 2) f_code[l] = 0;
+        }
     }
 
-    /* return zero to indicate successful completion of function */
+    /* Return zero to indicate successful completion of function */
     return 0;
 
-} /* end of function conv_wp */
+} /* End of function conv_wp */
 
 /* ===================================================================== */
 
-/* removes ext (if any) from a given filename string and passes back as
+/* Removes ext (if any) from a given filename string and passes back as
    out_name
  */
 void remove_ext(char *in_name, char *out_name) {
 
     int cnt=0;
     while ((in_name[cnt] != '.') && (in_name[cnt] != '\0')) {
-        /* step thru in_name looking for . or end of string */
+        /* Step thru in_name looking for . or end of string */
         cnt++;
     }
 
     out_name[cnt] = '\0';
-    /* this terminates out_name at the location of the "." in in_name string */
+    /* This terminates out_name at the location of the "." in in_name string */
 
-    /* now copy everything but filename ext into out_name */
+    /* Now copy everything but filename ext into out_name */
     while (cnt>0) {
-        cnt--; /* dec here so that we start with char before the "." */
+        cnt--; /* Dec here so that we start with char before the "." */
         out_name[cnt] = in_name[cnt];
     }
 }
@@ -472,9 +477,9 @@ void output_debug(char* message) {
 
 void help_scr(void) {
 
-    printf("Amstrad NC100 WP to RTF/TXT converter\n");
+    printf("Amstrad NC100 word processor to RTF/TXT/Markdown converter\n");
     printf("by Maksim Lin and Tony Smith, version %s\n", version);
-    printf("\nUsage: notepad2text [--text] /path/to/nc100/word/file\n\n");
+    printf("\nUsage: notepad2text [--text | --markdown] /path/to/nc100/word/file\n\n");
     printf("Options:\n");
     printf("  -t / --text      Output plain text rather than RTF.\n");
     printf("  -m / --markdown  Output Markdown rather than RTF.\n");

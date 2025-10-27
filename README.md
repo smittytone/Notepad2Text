@@ -34,12 +34,24 @@ notepad2text test.npd
 
 The output will be in same directory but named `.rtf`.
 
-If you'd rather just get plain text, add the `--text` flag:
+If you'd rather just get plain text, add the `--text` or `-t` flag:
 
 ```bash
 notepad2text --text test.npd
 ```
 
 The output will be in same directory but named `.txt`.
+
+### Markdown
+
+*notepad2text* now has optional Markdown output: used the `--markdown` or `-m` flag:
+
+```bash
+notepad2text --markdown test.npd
+```
+
+The output will be in same directory but named `.markdown`.
+
+Markdown conversion is necessarily limited: Protext has only one headline size, and beyond bold and italic, no other Protext text styles have Markdown equivalents. I will be exploring other styling and layout options for Markdown conversion going forward.
 
 Both types of output file use the Linux/macOS new line format.
